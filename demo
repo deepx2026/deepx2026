@@ -1,1 +1,1458 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StructuSlide — AI Native PPT 编辑器</title>
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --surface2: #eeeff2;
+  --border: #e2e5ea;
+  --text: #1e1f24;
+  --text2: #6e727a;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --accent-light: #eff6ff;
+  --accent-bar: #3b82f6;
+  --green: #10b981;
+  --green-light: #ecfdf5;
+  --amber: #f59e0b;
+  --amber-light: #fffbeb;
+  --red: #ef4444;
+  --red-light: #fef2f2;
+  --blue: #93c5fd;
+  --blue-light: #eff6ff;
+  --shadow: 0 1px 3px rgba(0,0,0,.06);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,.08);
+  --shadow-slide: 0 2px 16px rgba(0,0,0,.10);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== Top Bar ===== */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 24px; background: var(--surface);
+  border-bottom: 2px solid var(--accent-light);
+  z-index: 10;
+}
+.topbar .logo {
+  font-size: 20px; font-weight: 700;
+  color: var(--accent);
+}
+.topbar .sep { flex: 1; }
+.topbar .badge {
+  font-size: 12px; padding: 5px 12px; border-radius: 20px;
+  background: var(--accent-light); color: var(--accent); font-weight: 600;
+}
+
+/* ===== Steps Bar ===== */
+.steps {
+  display: flex; gap: 0; padding: 18px 24px 0;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.step {
+  flex-shrink: 0; padding: 12px 22px; font-size: 14px; font-weight: 500;
+  color: var(--text2); cursor: pointer; border-bottom: 3px solid transparent;
+  transition: all .2s; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+}
+.step .num {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  background: #eee; color: var(--text2);
+  transition: all .2s;
+}
+.step.active { color: var(--accent); border-bottom-color: var(--accent); }
+.step.active .num { background: var(--accent); color: #fff; }
+.step.done { color: var(--green); }
+.step.done .num { background: var(--green); color: #fff; }
+.step:hover:not(.active) { color: var(--text); border-bottom-color: var(--accent-light); }
+
+/* ===== Main Area ===== */
+.main {
+  flex: 1; display: flex; overflow: hidden; position: relative;
+}
+
+/* ===== Panels ===== */
+.panel {
+  display: none; flex-direction: column;
+  position: absolute; inset: 0;
+  padding: 32px; overflow-y: auto;
+}
+.panel.active { display: flex; }
+
+/* Upload panel */
+.upload-zone {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 18px;
+  border: 2px dashed var(--accent-light); border-radius: var(--radius);
+  margin: 20px; cursor: pointer; transition: all .2s;
+  background: var(--surface2);
+}
+.upload-zone:hover { border-color: var(--accent); background: var(--blue-light); }
+.upload-zone.drag { border-color: var(--accent); background: var(--accent-light); }
+.upload-icon { font-size: 52px; }
+.upload-text { font-size: 18px; font-weight: 600; }
+.upload-hint { font-size: 14px; color: var(--text2); }
+.uploaded-file {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 22px; background: var(--green-light); border-radius: var(--radius-sm);
+  border: 1px solid #a7f3d0;
+}
+.uploaded-file .icon { font-size: 30px; }
+.uploaded-file .name { font-weight: 600; font-size: 15px; }
+.uploaded-file .meta { font-size: 13px; color: var(--text2); }
+.uploaded-file .check { margin-left: auto; color: var(--green); font-size: 22px; }
+
+/* Focus selection */
+.focus-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+  flex: 1; align-content: center; max-width: 680px; margin: 0 auto;
+}
+.focus-card {
+  padding: 26px; border: 2px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: all .2s;
+  background: var(--surface);
+}
+.focus-card:hover { border-color: var(--accent); }
+.focus-card.selected { border-color: var(--accent); background: var(--blue-light); }
+.focus-card .icon { font-size: 36px; margin-bottom: 10px; }
+.focus-card .title { font-weight: 700; font-size: 17px; margin-bottom: 6px; }
+.focus-card .desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.focus-card .checkmark {
+  display: none; float: right;
+  width: 24px; height: 24px; border-radius: 50%; background: var(--accent);
+  color: #fff; text-align: center; line-height: 24px; font-size: 13px;
+}
+.focus-card.selected .checkmark { display: inline-block; }
+
+/* Blueprint panel */
+.blueprint-layout {
+  display: flex; gap: 20px; flex: 1; overflow: hidden;
+}
+.tree-panel {
+  flex: 1; max-width: 420px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px; overflow-y: auto;
+}
+.tree-panel h3 { font-size: 15px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+.tree-node {
+  margin-left: 0; user-select: none;
+}
+.tree-node .row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 6px;
+  cursor: grab; transition: background .15s; font-size: 14px;
+}
+.tree-node .row:hover { background: var(--accent-light); }
+.tree-node .row.dragging { opacity: .4; }
+.tree-node .row.drag-over { background: var(--blue-light); outline: 2px dashed var(--accent); border-radius: 6px; }
+.tree-node .row .toggle { width: 18px; cursor: pointer; color: var(--text2); font-size: 11px; }
+.tree-node .row .label { flex: 1; }
+.tree-node .row .label input {
+  border: none; background: transparent; font-size: 14px; font-family: var(--font);
+  width: 100%; padding: 2px 4px; border-radius: 4px;
+}
+.tree-node .row .label input:focus { outline: none; background: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.tree-node .row .actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.tree-node .row:hover .actions { opacity: 1; }
+.tree-node .row .actions button {
+  width: 26px; height: 26px; border: none; background: transparent;
+  cursor: pointer; border-radius: 4px; font-size: 13px; color: var(--text2);
+}
+.tree-node .row .actions button:hover { background: var(--accent-light); color: var(--red); }
+.tree-node .children { margin-left: 20px; border-left: 2px solid var(--accent-light); padding-left: 10px; }
+.preview-panel {
+  flex: 2; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.preview-panel h3 { font-size: 15px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+.preview-slide {
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow-slide);
+  overflow: hidden;
+  min-height: 320px;
+  position: relative;
+}
+.preview-slide .slide-accent-bar {
+  height: 5px; background: var(--accent-bar);
+}
+.preview-slide .slide-inner {
+  padding: 28px 34px;
+}
+.preview-slide .slide-page-num {
+  position: absolute; bottom: 12px; right: 20px;
+  font-size: 11px; color: #b0b5bd; font-weight: 500;
+}
+.preview-slide .slide-title {
+  font-size: 24px; font-weight: 700; margin-bottom: 22px;
+  color: var(--text); letter-spacing: -0.3px;
+  padding-bottom: 14px; border-bottom: 2px solid #f0f0f4;
+}
+.preview-slide .slide-body {
+  font-size: 15px; line-height: 2.0; color: #4a4d55;
+}
+.preview-slide .slide-body ul { padding-left: 1.2em; list-style: none; }
+.preview-slide .slide-body ul li { margin-bottom: 8px; position: relative; }
+.preview-slide .slide-body ul li::before { content: '•'; position: absolute; left: -1em; color: var(--accent); font-weight: 700; }
+.preview-slide .slide-body .placeholder { color: #b8bcc4; font-style: italic; }
+.preview-slide .slide-body b { color: var(--text); }
+.preview-slide .slide-body table { font-size: 13px; width: 100%; border-collapse: collapse; margin: 8px 0; }
+.preview-slide .slide-body table th { background: #f5f6f8; padding: 7px 10px; text-align: left; font-weight: 600; }
+.preview-slide .slide-body table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f4; }
+
+/* Stacked slides (multi-page preview) */
+.preview-slides-stack {
+  display: flex; flex-direction: column; gap: 20px;
+}
+.stacked-slide {
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  overflow: hidden; position: relative;
+  min-height: 200px; flex-shrink: 0;
+}
+.stacked-slide .slide-accent-bar { height: 4px; background: var(--accent-bar); }
+.stacked-slide .slide-inner { padding: 22px 28px; }
+.stacked-slide .slide-title {
+  font-size: 20px; font-weight: 700; margin-bottom: 14px;
+  color: var(--text); padding-bottom: 10px; border-bottom: 2px solid #f0f0f4;
+}
+.stacked-slide .slide-body { font-size: 14px; line-height: 1.9; color: #4a4d55; }
+.stacked-slide .slide-body ul { padding-left: 1.2em; list-style: none; }
+.stacked-slide .slide-body ul li { margin-bottom: 6px; position: relative; }
+.stacked-slide .slide-body ul li::before { content: '•'; position: absolute; left: -1em; color: var(--accent); font-weight: 700; }
+.stacked-slide .slide-body .placeholder { color: #b8bcc4; font-style: italic; }
+.stacked-slide .slide-body b { color: var(--text); }
+.stacked-slide .slide-body table { font-size: 12px; width: 100%; border-collapse: collapse; margin: 6px 0; }
+.stacked-slide .slide-body table th { background: #f5f6f8; padding: 5px 8px; text-align: left; font-weight: 600; }
+.stacked-slide .slide-body table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f4; }
+.stacked-slide .slide-page-num {
+  position: absolute; bottom: 10px; right: 16px;
+  font-size: 11px; color: #b0b5bd; font-weight: 500;
+}
+.stacked-slide code {
+  font-family: 'SF Mono', Consolas, monospace; font-size: 13px;
+  line-height: 1.6; white-space: pre-wrap;
+}
+
+/* Workshop panel */
+.workshop-layout {
+  display: flex; gap: 20px; flex: 1; overflow: hidden;
+}
+.workshop-cards {
+  flex: 2; display: flex; flex-wrap: wrap; gap: 14px; overflow-y: auto;
+  align-content: flex-start; padding: 4px;
+}
+.task-card {
+  width: calc(50% - 7px); background: var(--surface);
+  border: 2px solid var(--border); border-radius: var(--radius);
+  padding: 18px; transition: all .2s;
+}
+.task-card.running { border-left: 4px solid var(--accent); }
+.task-card.paused { border-left: 4px solid var(--amber); background: var(--amber-light); }
+.task-card.done { border-left: 4px solid var(--green); opacity: .85; }
+.task-card .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.task-card .card-header .card-icon { font-size: 20px; }
+.task-card .card-header .card-title { font-weight: 600; font-size: 14px; flex: 1; }
+.task-card .card-header .card-status {
+  font-size: 12px; padding: 4px 10px; border-radius: 14px; font-weight: 500;
+}
+.task-card.running .card-status { background: var(--accent-light); color: var(--accent); }
+.task-card.paused .card-status { background: var(--amber-light); color: var(--amber); }
+.task-card.done .card-status { background: var(--green-light); color: var(--green); }
+.task-card .card-preview {
+  font-size: 13px; color: var(--text2); line-height: 1.6;
+  max-height: 66px; overflow: hidden; margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+.task-card .card-bar {
+  height: 5px; background: #eee; border-radius: 3px; margin-bottom: 12px;
+  overflow: hidden;
+}
+.task-card .card-bar .fill {
+  height: 100%; border-radius: 3px; transition: width .3s;
+  background: var(--accent);
+}
+.task-card.paused .card-bar .fill { background: var(--amber); }
+.task-card.done .card-bar .fill { background: var(--green); }
+.task-card .card-actions { display: flex; gap: 8px; }
+.task-card .card-actions button {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 18px;
+  background: #fff; font-size: 12px; cursor: pointer; transition: all .15s;
+  font-family: var(--font);
+}
+.task-card .card-actions button:hover { background: var(--accent-light); }
+.task-card .card-actions button.pause-btn { color: var(--amber); border-color: #fcd34d; }
+.task-card .card-actions button.resume-btn { color: var(--accent); border-color: var(--blue); }
+.task-card .card-actions button.edit-btn { color: var(--accent2); border-color: var(--blue); }
+
+/* Edit instruction modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.35); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 28px; width: 500px;
+}
+.modal-box h4 { margin-bottom: 14px; font-size: 16px; }
+.modal-box textarea {
+  width: 100%; height: 110px; border: 2px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; font-size: 14px;
+  font-family: var(--font); resize: vertical;
+}
+.modal-box textarea:focus { outline: none; border-color: var(--accent); }
+.modal-box .btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+.modal-box .btns button {
+  padding: 10px 22px; border-radius: 8px; border: none;
+  cursor: pointer; font-size: 14px; font-weight: 500; font-family: var(--font);
+}
+.modal-box .btns .cancel { background: #eee; color: var(--text); }
+.modal-box .btns .confirm { background: var(--accent); color: #fff; }
+.modal-box .btns .confirm:hover { background: var(--accent2); }
+
+/* Review panel */
+.review-layout { display: flex; gap: 20px; flex: 1; overflow: hidden; }
+.review-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.review-item {
+  padding: 18px; border-radius: var(--radius-sm); border: 2px solid var(--border);
+  background: var(--surface); cursor: pointer; transition: all .15s;
+  display: flex; align-items: flex-start; gap: 14px;
+}
+.review-item:hover { border-color: var(--accent); }
+.review-item .sev {
+  padding: 5px 10px; border-radius: 14px; font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.review-item .sev.warn { background: var(--amber-light); color: #d97706; }
+.review-item .sev.info { background: var(--accent-light); color: var(--accent2); }
+.review-item .sev.err { background: var(--red-light); color: #dc2626; }
+.review-item .body { flex: 1; font-size: 14px; line-height: 1.7; }
+.review-item .body strong { display: block; margin-bottom: 4px; }
+.review-detail {
+  flex: 1.5; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; overflow-y: auto;
+}
+
+/* Export panel */
+.export-content {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 24px; text-align: center;
+}
+.export-card {
+  background: var(--surface); border: 2px solid var(--accent-light);
+  border-radius: var(--radius); padding: 40px 56px;
+}
+.export-card .check-icon { font-size: 64px; margin-bottom: 16px; }
+.export-card h2 { font-size: 22px; margin-bottom: 10px; }
+.export-card p { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
+.export-btns { display: flex; gap: 14px; }
+.export-btns button {
+  padding: 12px 28px; border-radius: 10px; border: none;
+  cursor: pointer; font-size: 15px; font-weight: 600; font-family: var(--font);
+  transition: all .15s;
+}
+.export-btns .btn-pptx { background: var(--accent); color: #fff; }
+.export-btns .btn-pptx:hover { background: var(--accent2); }
+.export-btns .btn-pdf { background: #1e1e1e; color: #fff; }
+.export-btns .btn-pdf:hover { background: #333; }
+.export-btns .btn-history { background: #fff; color: var(--text); border: 2px solid var(--border); }
+.export-btns .btn-history:hover { background: var(--accent-light); }
+
+/* ===== Bottom action bar ===== */
+.action-bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 24px; background: var(--surface);
+  border-top: 2px solid var(--accent-light); z-index: 10;
+}
+.action-bar .hint { font-size: 13px; color: var(--text2); flex: 1; }
+.action-bar button {
+  padding: 11px 26px; border-radius: 10px; border: none;
+  cursor: pointer; font-size: 15px; font-weight: 600; font-family: var(--font);
+  transition: all .15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+.btn-secondary { background: #fff; color: var(--text); border: 2px solid var(--border); }
+.btn-secondary:hover { background: var(--accent-light); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; top: 20px; right: 20px; z-index: 200;
+  padding: 14px 22px; background: #2d2640; color: #fff;
+  border-radius: 10px; font-size: 14px; font-weight: 500;
+  pointer-events: none; opacity: 0; transform: translateY(-10px);
+  transition: all .3s;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* ===== Animations ===== */
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.pulse { animation: pulse 1.5s infinite; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeInUp .4s ease; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .focus-grid { grid-template-columns: 1fr; }
+  .blueprint-layout { flex-direction: column; }
+  .tree-panel { max-width: none; }
+  .workshop-layout { flex-direction: column; }
+  .task-card { width: 100%; }
+  .review-layout { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <span class="logo">◈ StructuSlide</span>
+  <span style="font-size:14px;color:var(--text2);">AI Native PPT 编辑器</span>
+  <span class="sep"></span>
+  <span class="badge">🧪 Demo 原型</span>
+</div>
+
+<!-- Steps -->
+<div class="steps" id="stepsBar">
+  <div class="step active" data-step="0"><span class="num">1</span>上传论文</div>
+  <div class="step" data-step="1"><span class="num">2</span>选择侧重点</div>
+  <div class="step" data-step="2"><span class="num">3</span>叙事蓝图</div>
+  <div class="step" data-step="3"><span class="num">4</span>并行生成</div>
+  <div class="step" data-step="4"><span class="num">5</span>总览检查</div>
+  <div class="step" data-step="5"><span class="num">6</span>导出</div>
+</div>
+
+<!-- Main Content -->
+<div class="main" id="mainContent"></div>
+
+<!-- Action Bar -->
+<div class="action-bar" id="actionBar">
+  <span class="hint" id="actionHint">拖拽 PDF 文件到上方区域，或点击上传</span>
+  <button class="btn-secondary" id="btnReset" onclick="resetAll()" style="display:none;">↺ 重新开始</button>
+  <button class="btn-primary" id="btnNext" disabled onclick="nextStep()">下一步 →</button>
+</div>
+
+<!-- Edit Instruction Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <h4>✏️ 修改生成指令</h4>
+    <textarea id="editInstruction" placeholder="输入新的生成指令..."></textarea>
+    <div class="btns">
+      <button class="cancel" onclick="closeEditModal()">取消</button>
+      <button class="confirm" onclick="confirmEditInstruction()">保存并恢复生成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== State ====================
+const STATE = {
+  step: 0,
+  uploadedFile: null,
+  selectedFocus: null,
+  blueprint: null,
+  tasks: [],
+  reviewItems: [],
+  editingTaskId: null,
+};
+
+// ==================== Data ====================
+const FOCUS_MODES = [
+  { id: 'overview', icon: '📋', title: '综述概览', desc: '全面覆盖论文各部分，适合文献汇报。均衡分配背景、方法、结果、讨论的篇幅。' },
+  { id: 'method', icon: '🔬', title: '方法深挖', desc: '重点突出方法论与算法细节。适合需要讲解技术方案或复现实验的场景。' },
+  { id: 'experiment', icon: '🧪', title: '实验复现', desc: '聚焦实验设计、数据集、评估指标。适合讨论实验有效性或对比分析的场景。' },
+  { id: 'critical', icon: '💬', title: '批判性讨论', desc: '以论文优缺点分析为主线。适合组会讨论或审稿类汇报，强化批判性思考。' },
+];
+
+const INITIAL_BLUEPRINT = [
+  { id: 'bg', label: '研究背景与动机', children: [
+    { id: 'bg-1', label: '问题定义与范围', children: [] },
+    { id: 'bg-2', label: '现有方法的局限性', children: [] },
+  ]},
+  { id: 'method', label: '核心方法', children: [
+    { id: 'm-1', label: '整体架构设计', children: [] },
+    { id: 'm-2', label: '注意力机制改进', children: [] },
+    { id: 'm-3', label: '训练策略', children: [] },
+  ]},
+  { id: 'exp', label: '实验设计', children: [
+    { id: 'exp-1', label: '数据集与评估指标', children: [] },
+    { id: 'exp-2', label: '对比实验设置', children: [] },
+  ]},
+  { id: 'result', label: '结果分析', children: [
+    { id: 'res-1', label: '主实验结果', children: [] },
+    { id: 'res-2', label: '消融实验分析', children: [] },
+    { id: 'res-3', label: '可视化与案例', children: [] },
+  ]},
+  { id: 'conc', label: '结论与未来工作', children: [] },
+];
+
+const TASK_DEFS = [
+  { id: 'bg', title: '研究背景与动机', icon: '📖' },
+  { id: 'method', title: '核心方法', icon: '⚙️' },
+  { id: 'exp', title: '实验设计', icon: '🧪' },
+  { id: 'result', title: '结果分析', icon: '📊' },
+  { id: 'conc', title: '结论与未来工作', icon: '💡' },
+];
+
+const REVIEW_ITEMS = [
+  { id: 'r1', sev: 'warn', label: '术语不一致', detail: '第3页使用"准确率"，第7页使用"精确率"，两者为不同概念。<br>建议统一术语定义，或在首次出现时明确区分。', targetTask: 'method' },
+  { id: 'r2', sev: 'err', label: '缺少引用来源', detail: '第4页"相关工作"部分引用了3篇文献，但未标注具体出处。<br>建议添加参考文献编号。', targetTask: 'bg' },
+  { id: 'r3', sev: 'info', label: '内容重复', detail: '结论部分第2段与摘要第3句高度重合，建议修改其中一处以增强结论的信息密度。', targetTask: 'conc' },
+  { id: 'r4', sev: 'warn', label: '图表引用缺失', detail: '方法部分提到 "如图3所示" ，但该图尚未添加到页面中。', targetTask: 'method' },
+  { id: 'r5', sev: 'info', label: '逻辑过渡建议', detail: '从"实验设计"过渡到"结果分析"时缺少衔接语，建议添加一段简短的过渡说明。', targetTask: 'result' },
+];
+
+const SLIDE_CONTENTS = {
+  // ===== 综述概览 =====
+  'overview': {
+    'bg': { title: '研究背景与动机', body: '长文本理解是NLP领域的核心挑战之一。近年来预训练模型在各类任务上取得了显著进展，但Transformer架构的平方级复杂度在处理长序列时仍面临效率瓶颈。本文旨在平衡计算效率与语义完整性……<br><br><span class="placeholder">[综述模式：均衡覆盖论文各部分，帮助听众快速建立全局认知]</span>' },
+    'method': { title: '核心方法概览', body: '本文方法的核心思路是：通过自适应窗口划分降低计算量，通过跨层特征融合保留语义完整性。本章将概述整体架构设计思路，技术细节将在后续章节展开。<br><br>（综述模式下方法部分保持概括性，不深入算法细节）' },
+    'exp': { title: '实验设计概览', body: '实验覆盖6个主流基准数据集，对比了BERT-large、RoBERTa、Longformer等代表性基线方法。评估指标兼顾准确率（F1、EM）与生成质量（BLEU）。' },
+    'result': { title: '主要结果与对比', body: '主实验显示，本文方法在多个数据集上达到SOTA水平，尤其在长文本任务上优势明显。消融实验验证了各组件的独立贡献。' },
+    'conc': { title: '总结与展望', body: '本文提出了一种兼顾效率与语义的分层编码器架构。该方向未来可向多模态、跨语言场景扩展，并进一步降低推理延迟以适应实时应用需求。' },
+  },
+  // ===== 方法深挖 =====
+  'method': {
+    'bg': { title: '研究动机：现有方法的局限', body: '现有稀疏注意力方法（Longformer、BigBird）虽然降低了计算复杂度，但在语义捕获完整性上存在折损。问题的本质是：如何在减少计算量的同时，不丢失关键语义信息？<br><br><span class="placeholder">[方法深挖模式：聚焦技术方案，背景部分快速略过，为核心方法留篇幅]</span>' },
+    'method': { title: '分层编码器架构（核心）', body: '<b>组件一：自适应窗口划分</b><br>根据语义边界动态调整注意力窗口大小，而非固定窗口。关键创新：引入轻量级边界预测器，在推理阶段实时判断当前token的注意力范围。<br><br><b>组件二：跨层特征融合</b><br>引入门控机制选择性融合不同层级的特征表示，避免低层噪声对高层语义的干扰。门控参数通过对比学习联合优化。<br><br><b>组件三：训练策略</b><br>采用课程学习策略：先在小窗口上预训练，逐步扩大窗口尺寸；配合对比辅助损失增强表示的判别性。<br><br>📐 <span style="color:var(--accent);">伪代码见下方附录</span>' },
+    'exp': { title: '实验验证设计', body: '<b>关键消融设置：</b><br>① 固定窗口 vs 自适应窗口 → 验证边界预测器的有效性<br>② 简单拼接 vs 门控融合 → 验证跨层融合机制<br>③ 仅监督损失 vs 加对比损失 → 验证辅助损失的贡献<br><br>每个实验控制其他变量不变，确保结论可信。' },
+    'result': { title: '消融分析（核心发现）', body: '<b>自适应窗口贡献最大：</b>相比固定窗口，F1提升1.5个点，尤其在中长文本（>512 token）上优势最显著。<br><b>门控融合其次：</b>F1提升0.9个点，验证了选择性融合的必要性。<br><b>对比损失：</b>F1提升0.4个点，虽然增益小但在低资源场景下稳定性更好。' },
+    'conc': { title: '方法贡献与局限', body: '<b>核心贡献：</b>自适应窗口划分机制为稀疏注意力提供了新的设计思路——让模型自己决定"看多远"。<br><b>已知局限：</b>边界预测器增加了约5%的推理开销；当前仅在英文数据集上验证，跨语言场景待探索。' },
+  },
+  // ===== 实验复现 =====
+  'experiment': {
+    'bg': { title: '论文背景（简）', body: '本文提出了一种分层编码器架构用于长文本理解。以下聚焦实验设计与复现细节。<br><br><span class="placeholder">[实验复现模式：重点讨论数据集、评估指标、对比基线、实验设置，便于验证结论]</span>' },
+    'method': { title: '方法简述', body: '分层编码器的核心是自适应窗口划分+跨层融合。完整实现细节见论文Section 3。以下聚焦实验验证部分。' },
+    'exp': { title: '实验设置（完整）', body: '<b>数据集（6个）：</b><br>• SQuAD v2 — 问答，151k样本<br>• GLUE Benchmark — 综合理解，8个子任务<br>• HotpotQA — 多跳推理，113k样本<br>• TriviaQA — 开放域问答，95k样本<br>• NarrativeQA — 叙事理解，46k样本<br>• Qasper — 学术论文QA，5k样本<br><br><b>基线（5个）：</b>BERT-large, RoBERTa, Longformer, BigBird, LED<br><br><b>评估指标：</b>F1, Exact Match (EM), BLEU<br><br><b>硬件与超参：</b>8×A100 GPUs, batch size 32, learning rate 3e-5, warmup 10% steps, 训练约36小时' },
+    'result': { title: '完整结果表', body: '<table style="width:100%;font-size:13px;border-collapse:collapse;"><tr style="background:#f0f0f0;"><th>模型</th><th>SQuAD v2 (F1)</th><th>GLUE (Avg)</th><th>HotpotQA (F1)</th><th>推理速度</th></tr><tr><td>BERT-large</td><td>87.4</td><td>86.3</td><td>76.5</td><td>1.0x</td></tr><tr><td>RoBERTa</td><td>88.5</td><td>87.2</td><td>77.8</td><td>1.0x</td></tr><tr><td>Longformer</td><td>88.9</td><td>86.8</td><td>78.2</td><td>1.3x</td></tr><tr style="background:var(--accent-light);font-weight:600;"><td><b>本文方法</b></td><td><b>89.7</b></td><td><b>88.1</b></td><td><b>79.3</b></td><td><b>1.4x</b></td></tr></table><br><span style="font-size:12px;color:var(--text2);">*所有结果均为3次运行取平均，标准差<0.3</span>' },
+    'conc': { title: '可复现性说明', body: '论文提供了完整代码与预处理脚本。我们基于公开代码复现了主实验结果，偏差在0.2 F1以内。关键超参已在实验设计页列出，复现建议使用相同的A100硬件环境以确保训练时长可比。' },
+  },
+  // ===== 批判性讨论 =====
+  'critical': {
+    'bg': { title: '论文定位与动机', body: '本文瞄准长文本理解中的效率-语义平衡问题，这是一个真实存在的痛点。但需要追问：这个痛点的规模有多大？当前SOTA方法在实际应用中是否真的受限于此？<br><br><span class="placeholder">[批判性讨论模式：以论文优缺点分析为主线，适合组会讨论或审稿场景]</span>' },
+    'method': { title: '方法评估', body: '<b>优点：</b><br>• 自适应窗口的设计思路有原创性，将"固定窗口"改为"语义驱动的动态窗口"是直觉上合理的改进<br>• 门控融合机制简洁，没有引入过多额外参数<br><br><b>疑点：</b><br>• 边界预测器本身是一个额外的轻量模型，其预测误差是否会累积？论文对此分析不足<br>• 与近期工作（如Mamba架构）的对比缺失——如果状态空间模型本身就不需要稀疏注意力，本文方法的相对优势在哪？' },
+    'exp': { title: '实验评估的充分性', body: '<b>做得好的：</b><br>• 6个数据集覆盖了问答、推理、叙事等不同维度，消融实验设计合理<br>• 汇报了推理速度，这一点很多论文忽略<br><br><b>不足：</b><br>• 未在非英文数据集上验证，方法的语言通用性存疑<br>• 仅对比了BERT-era的基线，缺少与GPT-era方法的对比讨论<br>• 36小时训练时间在8×A100上是显著的成本，论文未讨论效率-性能的性价比分析' },
+    'result': { title: '结论的可靠性', body: '<b>主实验结果可信，但夸大程度需讨论：</b><br>• 2.3 F1的提升在SQuAD v2上是可感知的，但未做统计显著性检验（如bootstrap）<br>• 消融实验中"自适应窗口贡献最大"的结论依赖固定窗口大小的选择——如果固定窗口恰好调得好，差距可能缩小<br>• 推理速度的40%提升是否包含边界预测器的开销？论文中的表述模糊' },
+    'conc': { title: '总体评价与建议', body: '<b>总体：</b>一篇有价值的工作，核心创新清晰，实验扎实。但贡献被略微高估——"SOTA"的标签需要更多语言和模型规模的验证。<br><br><b>改进建议：</b>① 补充统计显著性检验 ② 与Mamba等新架构对比 ③ 开源边界预测器的预训练权重以降低复现成本' },
+  },
+};
+
+// 多页PPT内容：每个章节包含2-3页幻灯片，预览时垂直堆叠展示
+const SECTION_PAGES = {
+  'overview': {
+    'bg': [
+      { title: '研究背景', body: '长文本理解是NLP领域核心挑战之一。<br><br>• 近年来预训练模型在各类NLP任务上取得显著进展<br>• Transformer架构的平方级复杂度在处理长序列时面临效率瓶颈<br>• 长文档理解、多跳推理等场景对长文本建模需求日益增长<br>• 核心矛盾：<b>计算效率 vs 语义完整性</b>' },
+      { title: '现有方法的局限性', body: '当前主流长文本建模方案及其局限：<br><br><b>稀疏注意力</b>（Longformer, BigBird）<br>• 降低计算量但语义捕获完整性有折损<br>• 固定窗口模式缺乏对语义边界的感知<br><br><b>分段编码</b>（BERT-based, ToBERT）<br>• 跨段信息交互受限<br>• 段间依赖关系建模不足' },
+      { title: '本文的研究贡献', body: '提出一种兼顾效率与语义完整性的分层编码器架构。<br><br><b>三大贡献：</b><br>① 自适应窗口划分：根据语义边界动态调整注意力范围<br>② 跨层特征融合：门控机制选择性融合不同层级特征<br>③ 对比辅助损失：增强表示判别性的联合优化策略<br><br>在6个基准数据集上验证有效性，推理速度提升40%' },
+    ],
+    'method': [
+      { title: '整体架构设计', body: '分层编码器由三个核心组件构成。<br><br>输入序列 → <b>自适应窗口划分</b> → 并行编码 → <b>跨层特征融合</b> → 输出表示<br><br>设计原则：<br>• 窗口边界由语义驱动，非固定长度<br>• 各层独立编码后通过门控机制融合<br>• 端到端可微，支持梯度反向传播' },
+      { title: '架构优势与设计考量', body: '<b>相比现有方案的优势：</b><br>• vs 固定窗口稀疏注意力：语义感知的边界更合理<br>• vs 全注意力：计算复杂度从O(n²)降至O(n·k)，k为窗口大小<br>• vs 分段方案：跨窗口信息通过融合层保留<br><br><b>设计权衡：</b><br>• 边界预测器带来少量额外计算开销（~5%）<br>• 窗口数量需根据输入长度动态调整' },
+    ],
+    'exp': [
+      { title: '实验设置概览', body: '<b>数据集（6个）：</b><br>• SQuAD v2 · GLUE Benchmark · HotpotQA<br>• TriviaQA · NarrativeQA · Qasper<br><br><b>基线方法（5个）：</b><br>• BERT-large · RoBERTa · Longformer · BigBird · LED<br><br><b>评估指标：</b>F1 · Exact Match · BLEU' },
+      { title: '硬件与超参配置', body: '<b>硬件环境：</b>8× NVIDIA A100 (80GB) GPU<br><b>训练配置：</b><br>• Batch size: 32 · Learning rate: 3e-5<br>• Warmup: 10% steps · Optimizer: AdamW<br>• 训练时长：约36小时<br><br><b>公平性保障：</b>所有基线在相同硬件上重新运行，超参使用原论文推荐值' },
+    ],
+    'result': [
+      { title: '主实验结果', body: '<table style="width:100%;font-size:13px;"><tr style="background:#f5f6f8;"><th>模型</th><th>SQuAD v2</th><th>GLUE</th><th>HotpotQA</th></tr><tr><td>BERT-large</td><td>87.4</td><td>86.3</td><td>76.5</td></tr><tr><td>RoBERTa</td><td>88.5</td><td>87.2</td><td>77.8</td></tr><tr style="background:#eff6ff;font-weight:600;"><td>★ 本文方法</td><td>89.7</td><td>88.1</td><td>79.3</td></tr></table><br>在全部6个数据集上达到SOTA，尤其在长文本任务（HotpotQA +2.8 F1）上优势最显著。' },
+      { title: '消融实验分析', body: '<b>各组件独立贡献（SQuAD v2 F1）：</b><br><br>• 完整模型：89.7<br>• - 自适应窗口（改用固定窗口）：88.2 (-1.5)<br>• - 门控融合（改用简单拼接）：88.8 (-0.9)<br>• - 对比损失（仅用监督损失）：89.3 (-0.4)<br><br><b>结论：</b>自适应窗口贡献最大，但三个组件均有正向贡献，缺一不可。' },
+      { title: '推理效率分析', body: '<b>推理速度对比（相对BERT-large）：</b><br><br>• BERT-large：1.0x（基准）<br>• Longformer：1.3x<br>• 本文方法：<b>1.4x</b><br><br><b>不同输入长度下的表现：</b><br>• 512 tokens：1.2x<br>• 1024 tokens：1.4x<br>• 2048 tokens：1.6x<br><br>输入越长优势越明显，体现架构在长文本场景的可扩展性。' },
+    ],
+    'conc': [
+      { title: '研究总结', body: '<b>核心贡献回顾：</b><br>① 提出了自适应窗口划分机制，让模型根据语义动态决定注意力范围<br>② 设计了跨层门控融合模块，在效率与语义完整性间取得平衡<br>③ 在6个数据集上验证了效果，SQuAD v2 F1 89.7，推理速度提升40%<br><br><b>方法论意义：</b>为稀疏注意力的设计提供了新范式——从"固定模式"到"语义驱动"。' },
+      { title: '未来研究方向', body: '<b>短期计划：</b><br>• 在更多语言（中文、多语言）上验证方法的通用性<br>• 将边界预测器蒸馏为更轻量的版本，进一步降低推理开销<br><br><b>长期方向：</b><br>• 探索自适应窗口思想在多模态场景（视频+文本）的扩展<br>• 研究该架构在领域特化场景（法律、医疗）的迁移能力<br>• 与线性注意力（Mamba等）结合的可能性' },
+    ],
+  },
+  'method': {
+    'bg': [
+      { title: '核心问题定义', body: '长文本理解的效率-语义平衡问题。<br><br><b>关键矛盾：</b><br>• 全注意力：语义完整但O(n²)复杂度过高<br>• 稀疏注意力：效率提升但语义信息折损<br>• 分段方案：跨段交互受限<br><br><b>核心追问：</b>如何在减少计算量的同时，不丢失关键语义信息？<br><br><span style="color:var(--text2);font-size:13px;">方法深挖模式——背景部分快速略过</span>' },
+      { title: '相关工作简述', body: '<b>代表性稀疏注意力方法：</b><br>• Longformer (2020)：滑动窗口+全局token<br>• BigBird (2020)：随机+窗口+全局注意力<br>• Reformer (2020)：LSH-based注意力<br><br><b>共同局限：</b>窗口大小/模式固定，缺乏对输入内容的语义感知。本文核心创新正是解决这一局限。' },
+    ],
+    'method': [
+      { title: '组件一：自适应窗口划分', body: '<b>核心思想：</b>让模型自己决定"看多远"。<br><br><b>实现方式：</b><br>① 轻量级边界预测器（2层MLP）输入当前token表示<br>② 输出窗口边界概率分布<br>③ 根据概率动态划分注意力窗口<br>④ 窗口内使用全注意力，窗口间通过后续融合层连接<br><br><b>关键创新：</b>边界预测器与主模型联合训练，无需额外标注。' },
+      { title: '组件二：跨层特征融合', body: '<b>为什么需要融合：</b>不同层的表示携带不同粒度的语义信息，低层偏局部，高层偏全局。<br><br><b>门控融合机制：</b><br>• 为每个层级的特征学习一个门控权重 g ∈ [0,1]<br>• 最终表示 = Σ g_i · Layer_i(x)<br>• 门控参数通过对比学习联合优化<br><br><b>效果：</b>相比简单拼接/求和，门控融合避免了低层噪声对高层语义的干扰。' },
+      { title: '组件三：训练策略与伪代码', body: '<b>课程学习策略：</b><br>阶段1：小窗口（128 tokens）预训练 → 学习基础表示<br>阶段2：逐步扩大窗口（256→512→1024）→ 适应长序列<br>阶段3：加入对比辅助损失 → 增强表示判别性<br><br><b>算法伪代码：</b><br><code style="background:#f5f6f8;padding:8px;display:block;font-size:13px;">def AdaptiveWindow(X):<br>  boundaries = BoundaryPredictor(X)<br>  windows = dynamic_partition(X, boundaries)<br>  return windows</code>' },
+    ],
+    'exp': [
+      { title: '关键消融实验设计', body: '<b>消融一：固定窗口 vs 自适应窗口</b><br>目的：验证边界预测器的有效性<br>设置：固定窗口大小取128/256/512/1024四个值<br><br><b>消融二：简单拼接 vs 门控融合</b><br>目的：验证门控机制的必要性<br>设置：对比拼接(concat)、求和(sum)、加权平均、门控(gate)<br><br><b>消融三：监督损失 vs 监督+对比损失</b><br>目的：验证对比辅助损失的贡献<br>设置：控制其他变量不变，仅改变损失函数构成' },
+    ],
+    'result': [
+      { title: '消融实验结果', body: '<b>自适应窗口（SQuAD v2 F1）：</b><br>• 固定128：87.2<br>• 固定256：88.0<br>• 固定512：88.7<br>• 固定1024：88.2<br>• <b>自适应：89.7 (+1.5 over best fixed)</b><br><br><b>融合方式对比：</b><br>• Concat: 88.8 · Sum: 88.3 · Weighted: 88.6 · <b>Gate: 89.7</b><br><br><b>损失函数：</b><br>• 仅监督：89.3 · <b>监督+对比：89.7 (+0.4)</b>' },
+      { title: '深入分析', body: '<b>窗口大小敏感度分析：</b><br>自适应窗口在不同输入长度下均保持最优，固定窗口仅在特定长度范围内有效。<br><br><b>边界预测器可视化：</b>预测的窗口边界与句子/段落边界高度吻合（IoU=0.82），说明模型确实学到了语义边界。<br><br><b>效率-性能帕累托前沿：</b>本文方法位于最优区域——性能接近全注意力，速度接近最激进的稀疏方案。' },
+    ],
+    'conc': [
+      { title: '方法总结与局限', body: '<b>核心贡献：</b>自适应窗口划分机制为稀疏注意力提供了新的设计思路——从"固定模式"转向"语义驱动"。<br><br><b>已知局限：</b><br>① 边界预测器增加约5%推理开销<br>② 当前仅在英文数据集验证<br>③ 预测器作为额外模块增加了实现复杂度<br>④ 窗口数量超参仍需手动设定上限' },
+    ],
+  },
+  'experiment': {
+    'bg': [
+      { title: '论文背景（简）', body: '本文提出分层编码器架构用于长文本理解。以下聚焦<b>实验设计与复现细节</b>。<br><br><span style="color:var(--text2);font-size:13px;">实验复现模式——重点讨论数据集、评估、基线、实验设置</span>' },
+    ],
+    'method': [
+      { title: '方法简述', body: '分层编码器核心：自适应窗口划分 + 跨层门控融合。完整实现细节见论文Section 3。以下聚焦实验验证部分。' },
+    ],
+    'exp': [
+      { title: '完整实验设置', body: '<b>数据集详情：</b><br>• SQuAD v2 — 151k样本，抽取式QA<br>• GLUE — 8子任务，综合NLU<br>• HotpotQA — 113k，多跳推理<br>• TriviaQA — 95k，开放域QA<br>• NarrativeQA — 46k，叙事理解<br>• Qasper — 5k，学术论文QA<br><br><b>数据预处理：</b>最大序列长度4096，不足补零，超出截断' },
+      { title: '超参与运行环境', body: '<b>硬件：</b>8× A100 80GB<br><b>软件：</b>PyTorch 2.1, CUDA 12.1, Transformers 4.36<br><b>超参：</b><br>• Batch: 32 · LR: 3e-5 (linear decay)<br>• Warmup: 10% steps · Epochs: 10<br>• Optimizer: AdamW (β₁=0.9, β₂=0.999)<br>• 训练约36h · 评估使用beam search (beam=4)<br><br><b>复现代码：</b>github.com/example/hierarchical-encoder' },
+    ],
+    'result': [
+      { title: '完整结果表', body: '<table style="width:100%;font-size:12px;"><tr style="background:#f5f6f8;"><th>模型</th><th>SQuADv2</th><th>GLUE</th><th>HotpotQA</th><th>TriviaQA</th></tr><tr><td>BERT-large</td><td>87.4</td><td>86.3</td><td>76.5</td><td>72.1</td></tr><tr><td>RoBERTa</td><td>88.5</td><td>87.2</td><td>77.8</td><td>73.4</td></tr><tr><td>Longformer</td><td>88.9</td><td>86.8</td><td>78.2</td><td>74.0</td></tr><tr style="background:#eff6ff;font-weight:600;"><td>★ 本文</td><td>89.7</td><td>88.1</td><td>79.3</td><td>75.2</td></tr></table><br>所有结果为3次运行中位数，标准差<0.3' },
+      { title: '效率与资源消耗', body: '<table style="width:100%;font-size:12px;"><tr style="background:#f5f6f8;"><th>模型</th><th>推理速度</th><th>GPU内存</th><th>训练时长</th></tr><tr><td>BERT-large</td><td>1.0x</td><td>12GB</td><td>18h</td></tr><tr><td>Longformer</td><td>1.3x</td><td>16GB</td><td>24h</td></tr><tr style="background:#eff6ff;font-weight:600;"><td>★ 本文</td><td>1.4x</td><td>18GB</td><td>36h</td></tr></table><br>额外内存开销主要来自边界预测器和门控参数，占比约15%' },
+    ],
+    'conc': [
+      { title: '可复现性声明', body: '论文提供完整代码与预处理脚本于GitHub。我们已基于公开代码复现主实验结果，偏差在0.2 F1以内。<br><br>复现建议：<br>• 使用A100 GPU确保训练时长可比<br>• 随机种子设为42/123/2024取中位数<br>• 预处理脚本依赖datasets==2.15和nltk<br><br>已知的复现注意事项见GitHub FAQ。' },
+    ],
+  },
+  'critical': {
+    'bg': [
+      { title: '论文定位审视', body: '本文瞄准长文本理解的效率-语义平衡，这是一个<b>真实存在的痛点</b>。<br><br><b>需要追问：</b><br>• 这个痛点的实际规模有多大？<br>• 当前SOTA方法在实际应用中是否真的受限于此？<br>• 用户感知到的"慢"究竟是注意力计算还是其他环节？<br><br><span style="color:var(--text2);font-size:13px;">批判性讨论模式——以优缺点分析为主线</span>' },
+    ],
+    'method': [
+      { title: '方法创新性评估', body: '<b>优点：</b><br>• 自适应窗口设计有原创性——将"固定窗口"改为"语义驱动"是直觉合理且有效的改进<br>• 门控融合机制简洁，未引入过多额外参数<br>• 三阶段训练策略设计合理<br><br><b>疑点/不足：</b><br>• 边界预测器作为额外模型组件，其预测误差是否会累积？论文分析不足<br>• 与Mamba等线性注意力架构的对比缺失<br>• 窗口划分的可解释性讨论不足' },
+    ],
+    'exp': [
+      { title: '实验评估充分性', body: '<b>做得好的：</b><br>• 6个数据集覆盖QA/推理/叙事等多维度<br>• 消融实验设计合理，逐组件验证贡献<br>• 汇报了推理速度（许多论文忽略）<br><br><b>不足：</b><br>• 仅在英文数据上验证，语言通用性存疑<br>• 仅对比BERT-era基线，缺少GPT-era方法讨论<br>• 36h×8A100成本高昂，未提供性价比分析<br>• 未做统计显著性检验（如bootstrap）' },
+    ],
+    'result': [
+      { title: '结论可靠性分析', body: '<b>主实验结论可信，但有几个需要讨论的点：</b><br><br>• 2.3 F1在SQuAD v2上可感知，但无统计显著性检验支撑<br>• "自适应窗口贡献最大"依赖固定窗口baseline的选择——如果固定窗口调至最优，差距可能缩小<br>• 40%推理速度提升是否包含边界预测器开销？论文表述模糊<br>• 仅在Transformer架构上验证，推广到其他架构的可行性未知' },
+    ],
+    'conc': [
+      { title: '总体评价与改进建议', body: '<b>总体评价：</b>一篇有价值的工作，核心创新清晰，实验扎实。但贡献被略微高估——"SOTA"的标签需要更多语言和模型规模的验证。<br><br><b>改进建议（按优先级）：</b><br>① 补充统计显著性检验（bootstrap test）<br>② 与Mamba等新架构进行对比讨论<br>③ 开源边界预测器预训练权重，降低复现成本<br>④ 补充非英文+更长序列（8K+）的验证<br>⑤ 提供性价比分析（F1 gain / GPU hour）' },
+    ],
+  },
+};
+
+// 默认内容（上传论文后初始状态使用）
+const DEFAULT_SLIDE_CONTENTS = SLIDE_CONTENTS['overview'];
+
+// 根据当前选中的 focus mode 获取对应内容，未选择时 fallback 到 overview
+function getFocusContents() {
+  const mode = STATE.selectedFocus || 'overview';
+  return SLIDE_CONTENTS[mode] || SLIDE_CONTENTS['overview'];
+}
+
+// 获取某个章节在当前 focus mode 下的所有页面
+function getSectionPages(sectionId) {
+  const mode = STATE.selectedFocus || 'overview';
+  const modePages = SECTION_PAGES[mode] || SECTION_PAGES['overview'];
+  return modePages[sectionId] || SECTION_PAGES['overview'][sectionId] || [];
+}
+
+// 渲染可滚动的多页幻灯片堆叠
+function renderSlideStack(sectionId) {
+  const pages = getSectionPages(sectionId);
+  if (!pages.length) return '<span class="placeholder">该章节暂无预览页面</span>';
+  const pageMap = { 'bg': 3, 'method': 5, 'exp': 8, 'result': 11, 'conc': 14 };
+  const baseNum = pageMap[sectionId] || 1;
+  return pages.map((p, i) => `
+    <div class="stacked-slide">
+      <div class="slide-accent-bar"></div>
+      <div class="slide-inner">
+        <div class="slide-title">${p.title}</div>
+        <div class="slide-body">${p.body}</div>
+      </div>
+      <div class="slide-page-num">第 ${baseNum + i} / 15 页</div>
+    </div>
+  `).join('');
+}
+
+// ==================== Render ====================
+function renderPanel() {
+  const main = document.getElementById('mainContent');
+  const s = STATE.step;
+
+  if (s === 0) main.innerHTML = renderUpload();
+  else if (s === 1) main.innerHTML = renderFocus();
+  else if (s === 2) main.innerHTML = renderBlueprint();
+  else if (s === 3) main.innerHTML = renderWorkshop();
+  else if (s === 4) main.innerHTML = renderReview();
+  else if (s === 5) main.innerHTML = renderExport();
+
+  updateSteps();
+  updateActionBar();
+  bindPanelEvents();
+}
+
+function renderUpload() {
+  const file = STATE.uploadedFile;
+  return `
+    <div class="panel active">
+      <div class="upload-zone ${file ? '' : ''}" id="uploadZone" style="${file ? 'display:none' : 'flex'}">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">拖拽 PDF 文件到此处</div>
+        <div class="upload-hint">支持 .pdf 格式，最大 20MB</div>
+        <div style="margin-top:12px;font-size:13px;color:var(--text2);">— 或点击此处选择文件 —</div>
+      </div>
+      ${file ? `
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <div class="uploaded-file fade-in">
+            <span class="icon">📄</span>
+            <div>
+              <div class="name">${file.name}</div>
+              <div class="meta">${file.pages} 页 · ${file.size} · 已解析完成</div>
+            </div>
+            <span class="check">✓</span>
+          </div>
+        </div>
+        <div style="text-align:center;padding:12px;font-size:14px;color:var(--text2);">
+          ✅ 论文已解析，共识别出 5 个主要章节
+        </div>
+      ` : ''}
+    </div>`;
+}
+
+function renderFocus() {
+  return `
+    <div class="panel active">
+      <div style="text-align:center;margin-bottom:28px;">
+        <h2 style="font-size:20px;">选择解读侧重点</h2>
+        <p style="font-size:14px;color:var(--text2);margin-top:6px;">AI 将根据你选择的模式调整叙事策略</p>
+      </div>
+      <div class="focus-grid">
+        ${FOCUS_MODES.map(f => `
+          <div class="focus-card ${STATE.selectedFocus === f.id ? 'selected' : ''}" data-focus="${f.id}">
+            <span class="checkmark">✓</span>
+            <div class="icon">${f.icon}</div>
+            <div class="title">${f.title}</div>
+            <div class="desc">${f.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+function renderBlueprint() {
+  const bp = STATE.blueprint || INITIAL_BLUEPRINT;
+  const currentSlide = document.querySelector('.tree-node .row.active')?.dataset?.nodeId || 'bg';
+  return `
+    <div class="panel active">
+      <div style="margin-bottom:18px;">
+        <h2 style="font-size:20px;">📋 叙事蓝图</h2>
+        <p style="font-size:14px;color:var(--text2);">拖拽节点调整结构 · 双击编辑标题 · 点击节点预览对应幻灯片</p>
+      </div>
+      <div class="blueprint-layout">
+        <div class="tree-panel" id="treePanel">
+          <h3>🌳 结构化大纲</h3>
+          ${renderTree(bp)}
+        </div>
+        <div class="preview-panel" id="previewPanel">
+          <h3>📄 章节页面预览</h3>
+          <div class="preview-slides-stack" id="previewSlidesStack">
+            ${renderSlideStack(currentSlide)}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTree(nodes, depth = 0) {
+  return nodes.map(n => `
+    <div class="tree-node" data-node-id="${n.id}">
+      <div class="row" draggable="true" data-node-id="${n.id}">
+        ${n.children && n.children.length > 0
+          ? `<span class="toggle" onclick="toggleTreeNode('${n.id}')">▼</span>`
+          : `<span style="width:18px;"></span>`}
+        <span class="label"><input value="${escapeHtml(n.label)}" data-node-id="${n.id}" onchange="renameNode('${n.id}', this.value)" ondblclick="this.select()"></span>
+        <span class="actions">
+          <button title="添加子节点" onclick="addChildNode('${n.id}')">＋</button>
+          <button title="删除" onclick="deleteNode('${n.id}')">✕</button>
+        </span>
+      </div>
+      ${n.children && n.children.length > 0 ? `<div class="children" id="children-${n.id}">${renderTree(n.children, depth + 1)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderWorkshop() {
+  const tasks = STATE.tasks;
+  const allDone = tasks.length > 0 && tasks.every(t => t.status === 'done');
+  return `
+    <div class="panel active">
+      <div style="margin-bottom:18px;display:flex;align-items:center;gap:14px;">
+        <h2 style="font-size:20px;">🔧 多智能体工坊</h2>
+        <span style="font-size:13px;color:var(--text2);">${tasks.filter(t=>t.status==='done').length}/${tasks.length} 已完成</span>
+        ${allDone ? '<span style="font-size:13px;background:var(--green-light);color:var(--green);padding:5px 12px;border-radius:14px;">✅ 全部完成</span>' : ''}
+        ${tasks.some(t=>t.status==='running') ? '<span style="font-size:13px;color:var(--accent);font-weight:500;">⚡ 生成中...</span>' : ''}
+      </div>
+      <div class="workshop-layout">
+        <div class="workshop-cards" id="workshopCards">
+          ${tasks.map(t => renderTaskCard(t)).join('')}
+        </div>
+        <div class="preview-panel" style="flex:1;" id="workshopPreview">
+          <h3>📄 章节页面预览</h3>
+          <div class="preview-slides-stack" id="workshopSlidesStack">
+            <div class="stacked-slide">
+              <div class="slide-accent-bar"></div>
+              <div class="slide-inner">
+                <div class="slide-title">点击左侧任务卡片查看预览</div>
+                <div class="slide-body"><span class="placeholder">选择一个正在生成或已完成的任务以查看该章节的所有PPT页面...</span></div>
+              </div>
+              <div class="slide-page-num"></div>
+            </div>
+          </div>
+          <div style="margin-top:14px;font-size:12px;color:var(--text2);background:var(--amber-light);padding:10px 14px;border-radius:8px;">
+            💡 <b>提示：</b>你可以<b>暂停</b>任意卡片、<b>修改指令</b>后恢复生成——其他卡片不会受影响。
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderTaskCard(t) {
+  const progress = t.status === 'done' ? 100 : (t.status === 'paused' ? t.progress : Math.min(t.progress, 95));
+  const previewText = t.preview || '正在生成中...';
+  return `
+    <div class="task-card ${t.status} fade-in" id="card-${t.id}">
+      <div class="card-header">
+        <span class="card-icon">${t.icon}</span>
+        <span class="card-title">${t.title}</span>
+        <span class="card-status">${t.status === 'running' ? '生成中' : t.status === 'paused' ? '已暂停' : '已完成'}</span>
+      </div>
+      <div class="card-preview">${previewText}</div>
+      <div class="card-bar"><div class="fill" style="width:${progress}%"></div></div>
+      ${t.status !== 'done' ? `
+        <div class="card-actions">
+          ${t.status === 'running'
+            ? `<button class="pause-btn" onclick="pauseTask('${t.id}')">⏸ 暂停</button>`
+            : `<button class="resume-btn" onclick="resumeTask('${t.id}')">▶ 恢复</button>`}
+          <button class="edit-btn" onclick="editTaskInstruction('${t.id}')">✏️ 修改指令</button>
+        </div>` : `<div style="font-size:12px;color:var(--green);">✓ 生成完成 · 可点击查看</div>`}
+    </div>`;
+}
+
+function renderReview() {
+  const items = STATE.reviewItems;
+  const resolved = items.filter(i => i.resolved).length;
+  return `
+    <div class="panel active">
+      <div style="margin-bottom:18px;display:flex;align-items:center;gap:14px;">
+        <h2 style="font-size:20px;">🔍 智能审查</h2>
+        <span style="font-size:13px;color:var(--text2);">${resolved}/${items.length} 已处理</span>
+      </div>
+      <div class="review-layout">
+        <div class="review-list" id="reviewList">
+          ${items.map(r => `
+            <div class="review-item fade-in ${r.resolved ? 'resolved' : ''}" data-review-id="${r.id}" onclick="focusReviewItem('${r.id}')" style="${r.resolved ? 'opacity:.5;' : ''}">
+              <span class="sev ${r.sev === 'warn' ? 'warn' : r.sev === 'err' ? 'err' : 'info'}">${r.sev === 'err' ? '⚠ 错误' : r.sev === 'warn' ? '⚡ 警告' : 'ℹ 建议'}</span>
+              <div class="body">
+                <strong>${r.label}</strong>
+                ${r.detail.split('<br>')[0]}
+              </div>
+              ${r.resolved ? '<span style="color:var(--green);">✓ 已处理</span>' : `<button style="padding:5px 14px;border:2px solid var(--border);border-radius:14px;background:#fff;cursor:pointer;font-size:12px;font-family:var(--font);" onclick="event.stopPropagation();resolveReview('${r.id}')">标记已处理</button>`}
+            </div>
+          `).join('')}
+        </div>
+        <div class="review-detail" id="reviewDetail">
+          <h4 style="margin-bottom:10px;">📌 点击左侧条目查看详情</h4>
+          <p style="font-size:13px;color:var(--text2);">选择一条审查建议，可查看详细说明并跳转到对应章节。</p>
+        </div>
+        <div class="preview-panel" style="flex:1.5;" id="reviewSlidePanel">
+          <h3>📄 对应PPT页面</h3>
+          <div class="preview-slides-stack" id="reviewSlidesStack">
+            <div class="stacked-slide">
+              <div class="slide-accent-bar"></div>
+              <div class="slide-inner">
+                <div class="slide-title">选择审查条目后显示关联页面</div>
+                <div class="slide-body"><span class="placeholder">点击左侧审查建议，查看问题所在章节的所有PPT页面...</span></div>
+              </div>
+              <div class="slide-page-num"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderExport() {
+  return `
+    <div class="panel active">
+      <div class="export-content">
+        <div class="export-card fade-in">
+          <div class="check-icon">🎉</div>
+          <h2>PPT 已准备就绪</h2>
+          <p>共 15 页 · 已通过智能审查 · 所有章节经迭代优化</p>
+          <div class="export-btns">
+            <button class="btn-pptx" onclick="showToast('📥 导出 PPTX 成功！（模拟）')">📄 导出 PPTX</button>
+            <button class="btn-pdf" onclick="showToast('📥 导出 PDF 成功！（模拟）')">📑 导出 PDF</button>
+            <button class="btn-history" onclick="showToast('📋 编辑历史已保留')">📋 保留编辑历史</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ==================== Tree Operations ====================
+function toggleTreeNode(id) {
+  const children = document.getElementById('children-' + id);
+  if (children) {
+    children.style.display = children.style.display === 'none' ? '' : 'none';
+    const toggle = document.querySelector(`[data-node-id="${id}"] .toggle`);
+    if (toggle) toggle.textContent = children.style.display === 'none' ? '▶' : '▼';
+  }
+}
+
+function renameNode(id, newLabel) {
+  const bp = STATE.blueprint;
+  function walk(nodes) {
+    for (const n of nodes) {
+      if (n.id === id) { n.label = newLabel; return true; }
+      if (n.children && walk(n.children)) return true;
+    }
+    return false;
+  }
+  walk(bp);
+  // Sync task title
+  const task = STATE.tasks.find(t => t.id === id);
+  if (task) task.title = newLabel;
+}
+
+function addChildNode(parentId) {
+  const bp = STATE.blueprint;
+  function walk(nodes) {
+    for (const n of nodes) {
+      if (n.id === parentId) {
+        if (!n.children) n.children = [];
+        const newId = parentId + '-c' + (n.children.length + 1);
+        n.children.push({ id: newId, label: '新节点', children: [] });
+        return true;
+      }
+      if (n.children && walk(n.children)) return true;
+    }
+    return false;
+  }
+  walk(bp);
+  renderPanel();
+  showToast('➕ 已添加子节点');
+}
+
+function deleteNode(id) {
+  if (!confirm('确定删除该节点及其所有子节点？')) return;
+  const bp = STATE.blueprint;
+  function walk(nodes) {
+    const idx = nodes.findIndex(n => n.id === id);
+    if (idx >= 0) { nodes.splice(idx, 1); return true; }
+    for (const n of nodes) { if (n.children && walk(n.children)) return true; }
+    return false;
+  }
+  walk(bp);
+  renderPanel();
+  showToast('🗑 节点已删除 · 蓝图已更新');
+}
+
+// ==================== Task Operations ====================
+function pauseTask(id) {
+  const task = STATE.tasks.find(t => t.id === id);
+  if (task) task.status = 'paused';
+  updateWorkshopCards();
+  showToast(`⏸ "${task.title}" 已暂停，其他任务继续运行`);
+}
+
+function resumeTask(id) {
+  const task = STATE.tasks.find(t => t.id === id);
+  if (task) {
+    task.status = 'running';
+    updateWorkshopCards();
+    showToast(`▶ "${task.title}" 已恢复，按新指令重新生成`);
+    // Simulate progress
+    simulateProgress(id);
+  }
+}
+
+function editTaskInstruction(id) {
+  STATE.editingTaskId = id;
+  const task = STATE.tasks.find(t => t.id === id);
+  document.getElementById('editInstruction').value = task?.instruction || '';
+  document.getElementById('editModal').classList.add('show');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('show');
+  STATE.editingTaskId = null;
+}
+
+function confirmEditInstruction() {
+  const id = STATE.editingTaskId;
+  const newInst = document.getElementById('editInstruction').value;
+  if (id && newInst) {
+    const task = STATE.tasks.find(t => t.id === id);
+    if (task) {
+      task.instruction = newInst;
+      task.progress = 0;
+      task.preview = '';
+      task.status = 'running';
+      updateWorkshopCards();
+      showToast(`✏️ "${task.title}" 指令已更新，重新生成中...`);
+      simulateProgress(id);
+    }
+  }
+  closeEditModal();
+}
+
+function simulateProgress(id) {
+  const task = STATE.tasks.find(t => t.id === id);
+  if (!task || task.status !== 'running') return;
+
+  const interval = setInterval(() => {
+    if (task.status !== 'running') { clearInterval(interval); return; }
+    task.progress += Math.random() * 6 + 3;
+    if (task.progress >= 100) {
+      task.progress = 100;
+      task.status = 'done';
+      task.preview = generatePreview(task.id);
+      clearInterval(interval);
+      refreshTaskCard(id);
+      checkAllTasksDone();
+    } else {
+      task.preview = generatePartialPreview(task.id, task.progress);
+      refreshTaskCard(id);
+    }
+  }, 1200);
+}
+
+function generatePreview(id) {
+  const task = STATE.tasks.find(t => t.id === id);
+  const instruction = task ? task.instruction : '';
+  const focus = STATE.selectedFocus || 'overview';
+
+  // 基于 focus mode 的基础内容
+  const baseContents = {
+    'overview': {
+      'bg': '1. 问题定义：长文本理解是 NLP 的核心难题，现有 Transformer 架构的平方级复杂度限制了其在长序列上的应用...\n2. 现有方法局限：Longformer 等稀疏注意力方法在语义捕获完整性上存在折损...\n3. 本文贡献：提出兼顾效率与语义完整性的分层编码器...',
+      'method': '本章概述提出的分层编码器架构思路，技术细节见后续章节。保持概括性，重点传达设计理念。',
+      'exp': '实验覆盖6个主流基准数据集，对比了BERT-large、RoBERTa、Longformer等代表性基线。评估指标兼顾准确率与生成质量。',
+      'result': '主实验显示本文方法在多个数据集上达到SOTA水平。长文本任务优势尤为明显，消融实验验证了各组件独立贡献。',
+      'conc': '本文提出兼顾效率与语义的分层编码器。未来可向多模态、跨语言场景扩展，并进一步降低推理延迟。',
+    },
+    'method': {
+      'bg': '1. 核心问题：长文本理解的效率-语义平衡，现有稀疏注意力方法的局限性分析...\n2. 动机：如何在减少计算量的同时不丢失关键语义信息？',
+      'method': '分层编码器详细架构：\n• 组件一：自适应窗口划分 — 语义边界驱动的动态注意力窗口\n• 组件二：跨层特征融合 — 门控机制选择性融合不同层级特征\n• 组件三：训练策略 — 课程学习+对比辅助损失联合优化\n📐 算法伪代码：\nfunction AdaptiveWindow(X):\n  boundaries = BoundaryPredictor(X)\n  windows = dynamic_partition(X, boundaries)\n  attention = sparse_attn(windows)\n  return attention',
+      'exp': '消融实验设计：\n① 固定窗口 vs 自适应窗口 → 验证边界预测器\n② 简单拼接 vs 门控融合 → 验证跨层融合\n③ 仅监督损失 vs 加对比损失 → 验证辅助损失贡献\n每个实验控制其他变量不变。',
+      'result': '消融分析：\n• 自适应窗口贡献最大 → F1 +1.5，中长文本（>512 token）优势最显著\n• 门控融合其次 → F1 +0.9，验证选择性融合必要性\n• 对比损失 → F1 +0.4，低资源场景稳定性更好',
+      'conc': '贡献：自适应窗口为稀疏注意力提供新设计思路。局限：边界预测器增加约5%推理开销；仅英文数据集验证。',
+    },
+    'experiment': {
+      'bg': '本文提出分层编码器架构用于长文本理解。聚焦实验设计与复现细节。',
+      'method': '分层编码器核心：自适应窗口划分+跨层融合。完整实现见论文Section 3。以下聚焦实验验证。',
+      'exp': '实验设置（可复现）：\n• 数据集（6个）：SQuAD v2(151k), GLUE(8子任务), HotpotQA(113k), TriviaQA(95k), NarrativeQA(46k), Qasper(5k)\n• 基线（5个）：BERT-large, RoBERTa, Longformer, BigBird, LED\n• 评估：F1, Exact Match, BLEU\n• 硬件：8×A100 GPUs, batch 32, lr 3e-5, warmup 10%, 训练约36h',
+      'result': '完整结果（3次平均，std<0.3）：\n| 模型 | SQuADv2 F1 | GLUE Avg | HotpotQA F1 | 速度 |\n| BERT-large | 87.4 | 86.3 | 76.5 | 1.0x |\n| RoBERTa | 88.5 | 87.2 | 77.8 | 1.0x |\n| Longformer | 88.9 | 86.8 | 78.2 | 1.3x |\n| ★本文方法 | 89.7 | 88.1 | 79.3 | 1.4x |',
+      'conc': '可复现性：论文提供完整代码与预处理脚本。已基于公开代码复现主实验结果，偏差<0.2 F1。建议相同A100环境复现。',
+    },
+    'critical': {
+      'bg': '论文瞄准长文本理解的效率-语义平衡问题。需要追问：这个痛点的实际规模？SOTA方法是否真的受限于此？',
+      'method': '方法评估：\n优点：①自适应窗口设计有原创性 ②门控融合简洁未引入过多参数\n疑点：①边界预测器误差累积问题分析不足 ②与Mamba等新架构对比缺失',
+      'exp': '实验评估：\n做得好的：6数据集覆盖多维度，汇报推理速度\n不足：①未验证非英文数据 ②仅对比BERT-era基线，缺GPT-era对比 ③36h×8A100成本高，性价比分析缺失',
+      'result': '结论可靠性分析：\n• 2.3 F1提升可感知，但未做bootstrap显著性检验\n• "自适应窗口贡献最大"依赖固定窗口baseline选择\n• 推理速度40%提升是否含边界预测器开销？表述模糊',
+      'conc': '总体：有价值工作，核心创新清晰。但贡献被略微高估。建议：①补统计检验 ②与Mamba对比 ③开源预训练权重。',
+    },
+  };
+
+  const focusContents = baseContents[focus] || baseContents['overview'];
+  let base = focusContents[id] || '内容生成完成。';
+
+  // 如果用户修改过指令（非默认生成指令），在内容前追加响应标记
+  // 默认指令格式：在「xxx模式」下生成「xxx章节」的幻灯片内容。 或 生成「xxx章节」的幻灯片内容。
+  const isDefault = instruction.startsWith('在「') || instruction.startsWith('生成「');
+  if (instruction && !isDefault) {
+    // 根据指令关键词调整内容
+    const kw = instruction.toLowerCase();
+    if (kw.includes('详细') || kw.includes('伪代码') || kw.includes('流程图')) {
+      base = '【已按新指令调整：展开技术细节】\n• 已追加算法伪代码步骤\n• 已补充流程图说明\n• 扩展了技术实现的具体描述\n\n' + base;
+    } else if (kw.includes('简洁') || kw.includes('概括') || kw.includes('缩短')) {
+      base = '【已按新指令调整：精简为核心要点】\n' + (base.split('\n').filter(l => l.trim()).slice(0, 3).join('\n'));
+    } else if (kw.includes('创新') || kw.includes('贡献') || kw.includes('突出')) {
+      base = '【已按新指令调整：聚焦创新点与贡献】\n• 核心创新已突出\n• 与现有方法的差异已强化标注\n\n' + base;
+    } else {
+      // 通用响应：显示指令已生效
+      base = `【已按新指令调整：「${instruction.substring(0, 30)}${instruction.length > 30 ? '...' : ''}」】\n` + base;
+    }
+  }
+
+  return base;
+}
+
+function generatePartialPreview(id, progress) {
+  const full = generatePreview(id);
+  const chars = Math.floor(full.length * progress / 100);
+  return full.substring(0, chars) + '...';
+}
+
+function updateWorkshopCards() {
+  const container = document.getElementById('workshopCards');
+  if (container) {
+    container.innerHTML = STATE.tasks.map(t => renderTaskCard(t)).join('');
+  }
+}
+
+// 仅更新单张卡片的进度条和预览文本，不重建DOM，消除闪烁
+function refreshTaskCard(id) {
+  const task = STATE.tasks.find(t => t.id === id);
+  if (!task) return;
+  const card = document.getElementById('card-' + id);
+  if (!card) return;
+
+  // 更新进度条宽度
+  const bar = card.querySelector('.card-bar .fill');
+  if (bar) {
+    const progress = task.status === 'done' ? 100 : Math.min(task.progress, 95);
+    bar.style.width = progress + '%';
+  }
+
+  // 更新预览文本
+  const previewEl = card.querySelector('.card-preview');
+  if (previewEl) {
+    previewEl.textContent = task.preview || '正在生成中...';
+  }
+
+  // 如果任务完成，更新状态标签和边框样式
+  if (task.status === 'done') {
+    card.classList.remove('running');
+    card.classList.add('done');
+    const statusEl = card.querySelector('.card-status');
+    if (statusEl) {
+      statusEl.textContent = '已完成';
+      statusEl.style.background = 'var(--green-light)';
+      statusEl.style.color = 'var(--green)';
+    }
+    // 替换操作按钮为完成标记
+    const actionsEl = card.querySelector('.card-actions');
+    if (actionsEl) {
+      actionsEl.outerHTML = '<div style="font-size:12px;color:var(--green);">✓ 生成完成 · 可点击查看</div>';
+    }
+  }
+}
+
+function checkAllTasksDone() {
+  if (STATE.tasks.every(t => t.status === 'done')) {
+    showToast('✅ 全部章节生成完成！可以进入总览检查');
+  }
+}
+
+// ==================== Review ====================
+function focusReviewItem(id) {
+  const item = STATE.reviewItems.find(r => r.id === id);
+  if (!item) return;
+  const detail = document.getElementById('reviewDetail');
+  const task = STATE.tasks.find(t => t.id === item.targetTask);
+
+  // 更新审查详情
+  if (detail) {
+    detail.innerHTML = `
+      <h4 style="margin-bottom:10px;">${item.label}</h4>
+      <p style="font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:18px;">${item.detail}</p>
+      <div style="background:var(--accent-light);padding:14px;border-radius:8px;">
+        <strong style="font-size:13px;">📍 关联章节：</strong>
+        <span style="font-size:14px;">${task ? task.title : '—'}</span>
+        <button onclick="showToast('🔗 已跳转到「${task?.title || ''}」章节工坊卡片（模拟）')" style="margin-left:10px;padding:5px 14px;border:2px solid var(--accent);border-radius:14px;background:var(--blue-light);color:var(--accent);cursor:pointer;font-size:12px;font-family:var(--font);">跳转修改 →</button>
+      </div>
+    `;
+  }
+
+  // 更新关联PPT页面预览（多页堆叠）
+  const slideStack = document.getElementById('reviewSlidesStack');
+  if (slideStack && task) {
+    slideStack.innerHTML = renderSlideStack(task.id) || '<div class="stacked-slide"><div class="slide-inner"><span class="placeholder">该章节内容可在工坊中查看</span></div></div>';
+  }
+}
+
+function resolveReview(id) {
+  const item = STATE.reviewItems.find(r => r.id === id);
+  if (item) {
+    item.resolved = true;
+    renderPanel();
+    showToast('✓ 已标记为已处理');
+  }
+}
+
+// ==================== Navigation ====================
+function nextStep() {
+  if (STATE.step === 0 && !STATE.uploadedFile) return;
+  if (STATE.step === 1 && !STATE.selectedFocus) return;
+  if (STATE.step < 5) {
+    STATE.step++;
+    if (STATE.step === 2) {
+      STATE.blueprint = JSON.parse(JSON.stringify(INITIAL_BLUEPRINT));
+      showToast('🌳 AI 已生成叙事蓝图，你可以拖拽调整结构');
+    }
+    if (STATE.step === 3) {
+      initWorkshop();
+      showToast('🚀 已启动 5 个并行智能体，开始生成各章节');
+    }
+    if (STATE.step === 4) {
+      STATE.reviewItems = REVIEW_ITEMS.map(r => ({...r, resolved: false}));
+      showToast('🔍 AI 审查智能体已启动，发现 ' + STATE.reviewItems.length + ' 条建议');
+    }
+    renderPanel();
+  }
+}
+
+function prevStep() {
+  if (STATE.step > 0) {
+    STATE.step--;
+    renderPanel();
+  }
+}
+
+function goToStep(n) {
+  STATE.step = n;
+  if (n === 2 && !STATE.blueprint) STATE.blueprint = JSON.parse(JSON.stringify(INITIAL_BLUEPRINT));
+  if (n === 3 && STATE.tasks.length === 0) initWorkshop();
+  if (n === 4 && STATE.reviewItems.length === 0) STATE.reviewItems = REVIEW_ITEMS.map(r => ({...r, resolved: false}));
+  renderPanel();
+}
+
+function updateSteps() {
+  const steps = document.querySelectorAll('#stepsBar .step');
+  steps.forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i < STATE.step) el.classList.add('done');
+    if (i === STATE.step) el.classList.add('active');
+    el.onclick = () => goToStep(i);
+  });
+}
+
+function updateActionBar() {
+  const btn = document.getElementById('btnNext');
+  const hint = document.getElementById('actionHint');
+  const resetBtn = document.getElementById('btnReset');
+
+  if (resetBtn) resetBtn.style.display = STATE.step > 0 ? '' : 'none';
+
+  if (STATE.step === 0) {
+    btn.disabled = !STATE.uploadedFile;
+    hint.textContent = STATE.uploadedFile ? '论文已上传，点击下一步' : '拖拽 PDF 文件到上方区域，或点击上传';
+  } else if (STATE.step === 1) {
+    btn.disabled = !STATE.selectedFocus;
+    hint.textContent = STATE.selectedFocus ? '已选择侧重点，点击下一步生成蓝图' : '请选择一种解读模式';
+  } else if (STATE.step === 2) {
+    btn.disabled = false;
+    hint.textContent = '调整蓝图后点击下一步，启动并行生成';
+  } else if (STATE.step === 3) {
+    const allDone = STATE.tasks.length > 0 && STATE.tasks.every(t => t.status === 'done');
+    btn.disabled = !allDone;
+    hint.textContent = allDone ? '全部章节生成完毕，进入审查' : '等待所有智能体完成，或手动暂停/修改指令...';
+  } else if (STATE.step === 4) {
+    btn.disabled = false;
+    hint.textContent = '处理审查建议后，点击下一步导出';
+  } else if (STATE.step === 5) {
+    btn.style.display = 'none';
+    hint.textContent = '选择导出格式完成演示';
+  }
+}
+
+// ==================== Init Workshop ====================
+function initWorkshop() {
+  const focusModeName = FOCUS_MODES.find(f => f.id === STATE.selectedFocus)?.title || '综述概览';
+  STATE.tasks = TASK_DEFS.map(t => ({
+    ...t,
+    status: 'running',
+    progress: 0,
+    preview: '',
+    instruction: `在「${focusModeName}」模式下生成「${t.title}」章节的幻灯片内容。`,
+    icon: t.icon,
+  }));
+  // Trigger simulations
+  setTimeout(() => {
+    STATE.tasks.forEach(t => {
+      if (t.status === 'running') simulateProgress(t.id);
+    });
+  }, 500);
+}
+
+// ==================== Panel Events ====================
+function bindPanelEvents() {
+  // Upload step
+  const zone = document.getElementById('uploadZone');
+  if (zone) {
+    zone.addEventListener('click', () => simulateUpload());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag');
+      simulateUpload();
+    });
+  }
+
+  // Focus cards
+  document.querySelectorAll('.focus-card').forEach(card => {
+    card.addEventListener('click', () => {
+      STATE.selectedFocus = card.dataset.focus;
+      renderPanel();
+    });
+  });
+
+  // Tree node drag & drop (step 2)
+  if (STATE.step === 2) initDragDrop();
+
+  // Workshop task card clicks (step 3)
+  document.querySelectorAll('.task-card').forEach(card => {
+    card.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      const id = this.id.replace('card-', '');
+      const task = STATE.tasks.find(t => t.id === id);
+      if (task) {
+        const stack = document.getElementById('workshopSlidesStack');
+        if (stack) {
+          stack.innerHTML = renderSlideStack(id) || '<div class="stacked-slide"><div class="slide-inner"><span class="placeholder">该章节内容生成中...</span></div></div>';
+        }
+      }
+    });
+  });
+
+  // Blueprint tree node clicks (step 2)
+  document.querySelectorAll('.tree-node .row').forEach(row => {
+    row.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.classList.contains('toggle')) return;
+      const id = this.dataset.nodeId;
+      if (id) {
+        const stack = document.getElementById('previewSlidesStack');
+        if (stack) {
+          stack.innerHTML = renderSlideStack(id);
+        }
+      }
+    });
+  });
+}
+
+function simulateUpload() {
+  STATE.uploadedFile = {
+    name: 'Attention_Is_All_You_Need.pdf',
+    pages: 10,
+    size: '2.4 MB',
+  };
+  renderPanel();
+  showToast('📄 论文已解析，共 10 页，识别出 5 个主要章节');
+}
+
+function initDragDrop() {
+  let dragged = null;
+
+  document.querySelectorAll('.tree-node .row').forEach(row => {
+    row.addEventListener('dragstart', function(e) {
+      dragged = this;
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.nodeId);
+    });
+
+    row.addEventListener('dragend', function() {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      dragged = null;
+    });
+
+    row.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (this !== dragged) this.classList.add('drag-over');
+    });
+
+    row.addEventListener('dragleave', function() {
+      this.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.classList.remove('drag-over');
+      if (dragged && this !== dragged) {
+        const srcId = dragged.dataset.nodeId;
+        const dstId = this.dataset.nodeId;
+        moveNode(srcId, dstId);
+      }
+    });
+  });
+}
+
+function moveNode(srcId, dstId) {
+  const bp = STATE.blueprint;
+  let srcNode = null, srcParent = null, srcIdx = -1;
+  let dstParent = null, dstIdx = -1;
+
+  function find(nodes, parent = null) {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].id === srcId) { srcNode = nodes[i]; srcParent = nodes; srcIdx = i; }
+      if (nodes[i].id === dstId) { dstParent = nodes; dstIdx = i; }
+      if (nodes[i].children) find(nodes[i].children, nodes[i]);
+    }
+  }
+  find(bp);
+
+  if (srcNode && dstParent && srcIdx >= 0 && dstIdx >= 0) {
+    srcParent.splice(srcIdx, 1);
+    // Adjust dstIdx if src was before dst in same parent
+    const insertIdx = (srcParent === dstParent && srcIdx < dstIdx) ? dstIdx : dstIdx + 1;
+    dstParent.splice(insertIdx, 0, srcNode);
+    renderPanel();
+    showToast('📋 节点顺序已更新 · 内容区将自动重排');
+  }
+}
+
+// ==================== Helpers ====================
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function resetAll() {
+  if (!confirm('确定重新开始？当前所有进度将被清除。')) return;
+  STATE.step = 0;
+  STATE.uploadedFile = null;
+  STATE.selectedFocus = null;
+  STATE.blueprint = null;
+  STATE.tasks = [];
+  STATE.reviewItems = [];
+  document.getElementById('btnNext').style.display = '';
+  renderPanel();
+  showToast('↺ 已重置');
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey) nextStep();
+  if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey) prevStep();
+});
+
+// ==================== Init ====================
+renderPanel();
+</script>
+</body>
+</html>
